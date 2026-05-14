@@ -1,4 +1,4 @@
-﻿using CloneDash.Compatibility.Valve;
+using CloneDash.Compatibility.Valve;
 
 using Microsoft.Win32;
 
@@ -14,8 +14,28 @@ namespace CloneDash.Compatibility.MuseDash
 			string? steamInstallPath = Registry.GetValue("HKEY_LOCAL_MACHINE\\SOFTWARE\\Valve\\Steam", "InstallPath", null) as string;
 			if (steamInstallPath == null) { // Sometimes the install path will be here instead
 				steamInstallPath = Registry.GetValue("HKEY_LOCAL_MACHINE\\SOFTWARE\\WOW6432NODE\\Valve\\Steam", "InstallPath", null) as string;
-				if (steamInstallPath == null)
-					return MDCompatLayerInitResult.SteamNotInstalled;
+				if (steamInstallPath == null) {
+					// Steam not found, ask user to manually select Muse Dash installation
+					Logs.Warn("Steam installation not found. Prompting user to manually select Muse Dash installation...");
+					string? manualPath = InstallationPathSelector.SelectMuseDashInstallation();
+					if (manualPath == null)
+						return MDCompatLayerInitResult.MuseDashNotInstalled;
+					
+					WhereIsMuseDashInstalled = manualPath;
+					WhereIsMuseDashDataFolder = Path.Combine(manualPath, "MuseDash_Data");
+					
+					string platform = "StandaloneWindows64";
+					StandalonePlatform = platform;
+					
+					string musedash_streamingassets = manualPath + $"\\MuseDash_Data\\StreamingAssets\\aa\\{platform}\\";
+					if (!Directory.Exists(musedash_streamingassets))
+						return MDCompatLayerInitResult.StreamingAssetsNotFound;
+					
+					BuildTarget = musedash_streamingassets;
+					StreamingFiles = Directory.GetFiles(musedash_streamingassets);
+					
+					return MDCompatLayerInitResult.OK;
+				}
 			}
 
 			// Figure out from Steam where Muse Dash is installed, if it is installed, otherwise break out
@@ -33,23 +53,44 @@ namespace CloneDash.Compatibility.MuseDash
 				}
 			}
 
-			if (!musedash_installed)
-				return MDCompatLayerInitResult.MuseDashNotInstalled;
+			if (!musedash_installed) {
+				// Muse Dash not found in Steam, ask user to manually select installation
+				Logs.Warn("Muse Dash not found in Steam libraries. Prompting user to manually select Muse Dash installation...");
+				string? manualPath = InstallationPathSelector.SelectMuseDashInstallation();
+				if (manualPath == null)
+					return MDCompatLayerInitResult.MuseDashNotInstalled;
+				
+				WhereIsMuseDashInstalled = manualPath;
+				WhereIsMuseDashDataFolder = Path.Combine(manualPath, "MuseDash_Data");
+				
+				string platform = "StandaloneWindows64";
+				StandalonePlatform = platform;
+				
+				string musedash_streamingassets = manualPath + $"\\MuseDash_Data\\StreamingAssets\\aa\\{platform}\\";
+				if (!Directory.Exists(musedash_streamingassets))
+					return MDCompatLayerInitResult.StreamingAssetsNotFound;
+				
+				BuildTarget = musedash_streamingassets;
+				StreamingFiles = Directory.GetFiles(musedash_streamingassets);
+				
+				return MDCompatLayerInitResult.OK;
+			}
+			
 			WhereIsMuseDashInstalled = musedash_installdir;
 			WhereIsMuseDashDataFolder = Path.Combine(musedash_installdir, "MuseDash_Data");
 
 			// If installed, load noteinfo.json for BMS references
 			// The bundle is named globalconfigs_assets_notedatamananger
 
-			string platform = "StandaloneWindows64";
-			StandalonePlatform = platform;
+			string platform_steam = "StandaloneWindows64";
+			StandalonePlatform = platform_steam;
 
-			string musedash_streamingassets = musedash_installdir + $"\\MuseDash_Data\\StreamingAssets\\aa\\{platform}\\"; // TODO: support multiple platforms
-			if (!Directory.Exists(musedash_streamingassets))
+			string musedash_streamingassets_steam = musedash_installdir + $"\\MuseDash_Data\\StreamingAssets\\aa\\{platform_steam}\\"; // TODO: support multiple platforms
+			if (!Directory.Exists(musedash_streamingassets_steam))
 				return MDCompatLayerInitResult.StreamingAssetsNotFound;
 
-			BuildTarget = musedash_streamingassets;
-			StreamingFiles = Directory.GetFiles(musedash_streamingassets);
+			BuildTarget = musedash_streamingassets_steam;
+			StreamingFiles = Directory.GetFiles(musedash_streamingassets_steam);
 
 			// The note data file would be loaded here from the assetbundle, then the notedata extracted
 
